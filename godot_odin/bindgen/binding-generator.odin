@@ -307,6 +307,8 @@ Operator :: enum {
   // containment
   OP_IN,
   OP_MAX,
+  // other
+  OP_IS_NOT,
 }
 `)
   }
@@ -968,6 +970,8 @@ correct_operator :: proc(op: string) -> string {
     return "OP_OR"
   case "xor":
     return "OP_XOR"
+  case "not":
+    return "OP_NOT"
   case "!":
     return "OP_NOT"
   // containment
@@ -1582,6 +1586,8 @@ clean_string_names :: proc(ptr: rawptr = nil) {
         if crt in pta {
           ptr = ""
         }
+
+		if correct_operator(operator_name) == "OP_NOT" do continue
         
         if "right_type" in operator.(json.Object) {
           if !(cop in operators_map) {
@@ -1639,6 +1645,7 @@ clean_string_names :: proc(ptr: rawptr = nil) {
       }
     }
     for op_k, op_v in operators_map {
+      if op_v == 0 do continue
       os.write_string(fd, fmt.tprintf("%s :: proc{{", op_k))
       for i in 0..<op_v {
         os.write_string(fd, fmt.tprintf("%soperator_%s%d", i>0 ? ", " : "", op_k, i))
@@ -1712,6 +1719,8 @@ generate_builtin_bindings :: proc(root: json.Object, target_dir: string, build_c
     // Write something similar to class header/source files for odin
     for builtin_api in root["builtin_classes"].(json.Array) {
       name := fmt.tprintf("%s", builtin_api.(json.Object)["name"])
+      fmt.printf("Generate builtin class: {}\n", name)
+
       if is_pod_type(name) { continue }
       if is_included_type(name) { continue }
 
@@ -1892,6 +1901,8 @@ generate_engine_classes :: proc(class_api: json.Object, target_dir: string, used
   snake_class_name := camel_to_snake(class_name)
   dir := fmt.tprintf("%s/%s", target_dir, snake_class_name)
   class_file := fmt.tprintf("%s/%s%s", dir, snake_class_name, ".odin")
+
+  fmt.printf("Generate engine class: {}\n", class_name)
 
   // instead of making an odin struct "fit" what a class should be
   // make a package of snake_class_name that contains NO member variables/data struct(class_name) but
@@ -2192,13 +2203,13 @@ generate_engine_classes_bindings :: proc(root: json.Object, target_dir: string, 
   
   for class_api in root["classes"].(json.Array) {
     class_name := fmt.tprintf("%s", class_api.(json.Object)["name"])
+	fmt.printf("Generate engine class binding: {}\n", class_name)
     if class_name == "ClassDB" do continue
-
-		if class_name == "OS" {
-			file = strings.concatenate([]string{target_dir, "/engine_structures2.odin"})
-			os.close(sfd)
-			do_open_file(file) // splits up engine_structures.odin into two files, so that ols doesn't crash from a super big file
-		}
+	if class_name == "OS" do continue
+	// 	file = strings.concatenate([]string{target_dir, "/engine_structures2.odin"})
+	// 	os.close(sfd)
+	// 	do_open_file(file) // splits up engine_structures.odin into two files, so that ols doesn't crash from a super big file
+	// }
 
     used_classes : [dynamic]string
     fully_used_classes : [dynamic]string
